@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Square - Chat & Fun</title>
+    <title>Square - Chat & Amis</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
     
@@ -21,14 +21,24 @@
         import { createApp } from "https://unpkg.com/vue@3/dist/vue.esm-browser.js";
 
         const firebaseConfig = {
+
         apiKey: "AIzaSyAHOsMHLpi0XNcb4rSMHA_ZJr1VkhnXebQ",
+
         authDomain: "messagerie-didi.firebaseapp.com",
+
         projectId: "messagerie-didi",
+
         storageBucket: "messagerie-didi.firebasestorage.app",
+
         messagingSenderId: "243037235936",
+
         appId: "1:243037235936:web:0b1313ae09cb7acb5b3e85",
+
         measurementId: "G-M2DETH5BWE"
+
         };
+
+
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -55,7 +65,8 @@
                     searchContactTerm: '',
                     newBio: '',
                     showContactProfile: false,
-                    showEmojiPicker: false
+                    showEmojiPicker: false,
+                    currentMobileView: 'list'
                 }
             },
             computed: {
@@ -293,6 +304,7 @@
                 },
 
                 async selectContact(contact) {
+                    this.currentMobileView = 'chat';
                     // 1. Récupérer les infos complètes de l'ami (dont la bio)
                     const userSnap = await getDocs(query(collection(db, "users"), where("uid", "==", contact.uid)));
                     if (!userSnap.empty) {
@@ -445,39 +457,90 @@
                     </template>
 
                     <template v-else>
-                        <div class="mb-6">
-                            <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2 px-4">Reçues ({{pendingRequests.length}})</h3>
-                            <div v-for="req in pendingRequests" :key="req.id" class="p-4 bg-white/5 rounded-2xl mb-2 flex flex-col gap-3">
-                                <div class="flex justify-between items-start">
-                                    <span class="text-xs font-bold">{{ req.fromName }}</span>
-                                    <span class="text-[9px] text-slate-500">{{ formatDate(req.createdAt) }}</span>
+                        <div :class="{'hidden md:flex': currentMobileView === 'chat', 'flex': currentMobileView === 'list'}" 
+                            class="w-full md:w-80 border-r border-white/5 flex flex-col bg-black/20">
+                            
+                            <div class="p-6">
+                                <div class="flex justify-between items-center mb-6">
+                                    <span class="font-black italic text-xl">SQUARE.</span>
+                                    <div class="relative">
+                                        <button @click="view = 'requests'" class="p-2 hover:bg-white/10 rounded-full relative group">
+                                            <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                            </svg>
+                                            <span v-if="pendingRequests.length" class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0f172a]"></span>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="flex gap-2">
-                                    <button @click="acceptRequest(req)" class="flex-1 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white p-2 rounded-lg transition flex justify-center">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </button>
+                                    <input v-model="searchUsername" @keyup.enter="sendFriendRequest" placeholder="Ajouter..." class="flex-1 bg-white/5 border border-white/10 p-3 rounded-xl text-xs outline-none">
+                                    <button @click="sendFriendRequest" class="bg-blue-600 px-4 rounded-xl font-bold">+</button>
+                                </div>
+                            </div>
 
-                                    <button @click="rejectRequest(req.id)" class="flex-1 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white p-2 rounded-lg transition flex justify-center">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
+                            <div class="flex-1 overflow-y-auto px-3 space-y-2">
+                                <div v-for="c in filteredContacts" 
+                                    :key="c.uid"
+                                    @click="selectContact(c)"
+                                    :class="selectedContact?.uid === c.uid ? 'bg-blue-600 shadow-xl' : 'hover:bg-white/5'"
+                                    class="p-4 rounded-2xl cursor-pointer transition flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold">{{ c.username[0] }}</div>
+                                    <span class="font-bold">{{ c.username }}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="p-4 flex items-center gap-3 border-t border-white/5">
+                                <div @click="showProfileModal = true" class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-bold cursor-pointer">
+                                    {{ user.displayName ? user.displayName[0] : '?' }}
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-bold">{{ user.displayName }}</p>
+                                    <button @click="logout" class="text-[10px] text-slate-500 hover:text-red-400 uppercase font-black">Déconnexion</button>
                                 </div>
                             </div>
                         </div>
 
-                        <div>
-                            <h3 class="text-[10px] font-black uppercase text-slate-500 mb-2 px-4 italic">Mes envois ({{sentRequests.length}})</h3>
-                            <div v-for="req in sentRequests" :key="req.id" class="p-4 bg-white/[0.02] border border-white/5 rounded-2xl mb-2 flex justify-between items-center">
-                                <div class="flex flex-col">
-                                    <span class="text-xs font-bold text-blue-400">@{{ req.toName }}</span>
-                                    <span class="text-[9px] text-slate-500 uppercase font-medium italic">
-                                        Envoyé {{ formatDate(req.createdAt) }}
-                                    </span>
+                        <div :class="{'hidden md:flex': currentMobileView === 'list', 'flex': currentMobileView === 'chat'}" 
+                            class="flex-1 flex flex-col bg-white/[0.01]">
+                            
+                            <div v-if="selectedContact" class="flex-1 flex flex-col min-h-0">
+                                <header class="h-20 md:h-24 flex items-center justify-between px-4 md:px-8 border-b border-white/5 bg-black/10">
+                                    <div class="flex items-center gap-3">
+                                        <button @click="currentMobileView = 'list'" class="md:hidden p-2 text-slate-400">
+                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        
+                                        <div @click="showContactProfile = true" class="flex items-center gap-3 cursor-pointer">
+                                            <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold overflow-hidden">
+                                                <img v-if="selectedContact.avatar" :src="selectedContact.avatar" class="w-full h-full object-cover">
+                                                <span v-else>{{ selectedContact.username[0] }}</span>
+                                            </div>
+                                            <span class="font-bold tracking-tight">{{ selectedContact.username }}</span>
+                                        </div>
+                                    </div>
+                                </header>
+
+                                <div ref="msgContainer" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
+                                    </div>
+
+                                <div class="p-4 md:p-6 relative">
+                                    <div v-show="showEmojiPicker" id="emoji-picker-container" class="absolute bottom-24 right-6"></div>
+                                    <div class="bg-white/5 border border-white/10 rounded-2xl md:rounded-3xl flex items-center pr-2 focus-within:border-blue-500">
+                                        <button @click="toggleEmojiPicker" class="pl-4 text-slate-400 hover:text-yellow-400">
+                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        </button>
+                                        <input v-model="newMessage" @keyup.enter="sendMessage" placeholder="Message..." class="bg-transparent flex-1 p-4 md:p-5 outline-none text-sm">
+                                        <button @click="sendMessage" class="p-3 bg-blue-600 rounded-xl md:rounded-2xl">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+                                        </button>
+                                    </div>
                                 </div>
-                                <button @click="cancelRequest(req.id)" class="text-[10px] text-red-400 font-bold hover:underline">Annuler</button>
+                            </div>
+                            
+                            <div v-else class="flex-1 flex items-center justify-center text-slate-600 italic">
+                                Sélectionnez un contact pour chatter
                             </div>
                         </div>
                     </template>
@@ -637,4 +700,3 @@
     </div>
 </body>
 </html>
-
